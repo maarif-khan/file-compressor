@@ -4,6 +4,7 @@
 #include <string>
 #include <unordered_map>
 #include <memory>
+#include <functional>
 #include "argparse/argparse.hpp"
 #include "include/rle.hpp"
 #include "include/huffman.hpp"
@@ -49,7 +50,7 @@ int main(int argc, char* argv[]) {
     program.add_argument("-a", "--algorithm")
         .help("compression algorithm")
         .default_value(std::string("rle"))
-        .choices("rle", "huffman", "lzw", "media");
+        .choices("rle", "huffman", "lzw");
 
     program.add_argument("-d", "--decompress")
         .help("Decompress instead of compress")
@@ -91,11 +92,6 @@ int main(int argc, char* argv[]) {
                 std::cout << "Using Huffman encoding.\n";
                 auto [compressed_data, tree] = Huffman::compress(data);
 
-                std::unordered_map<uint8_t, int> frequency;
-                for (uint8_t byte : data) {
-                    frequency[byte]++;
-                }
-
                 std::unordered_map<uint8_t, std::string> codes;
                 std::function<void(std::shared_ptr<HuffmanNode>, std::string)> generateCodes =
                     [&](std::shared_ptr<HuffmanNode> node, std::string code) {
@@ -125,29 +121,6 @@ int main(int argc, char* argv[]) {
             } else if (algorithm == "lzw") {
                 result = LZW::compress(data);
                 std::cout << "Using LZW compression.\n";
-            } else if (algorithm == "media") {
-                std::cout << "Using FFmpeg for media compression.\n";
-
-                std::string ext = std::filesystem::path(input_file).extension().string();
-                std::string cmd;
-
-                if (ext == ".mp3" || ext == ".wav" || ext == ".flac" || ext == ".aac") {
-                    // Audio compression
-                    cmd = "ffmpeg -y -i \"" + input_file + "\" -b:a 64k \"" + output_file + "\"";
-                } else if (ext == ".mp4" || ext == ".mkv" || ext == ".avi" || ext == ".mov") {
-                    // Video compression
-                    cmd = "ffmpeg -y -i \"" + input_file + "\" -b:v 1000k -bufsize 1000k \"" + output_file + "\"";
-                } else {
-                    throw std::runtime_error("Unsupported media format for compression: " + ext);
-                }
-
-                int ret = std::system(cmd.c_str());
-                if (ret != 0) {
-                    throw std::runtime_error("FFmpeg command failed.");
-                }
-
-                std::cout << "Media compression completed.\n";
-                return 0;
             }
 
             std::cout << "Compressed size: " << result.size() << " bytes\n";
@@ -179,10 +152,8 @@ int main(int argc, char* argv[]) {
 
             } else if (algorithm == "lzw") {
                 result = LZW::decompress(data);
-            } else if (algorithm == "media") {
-                std::cerr << "Media decompression is not supported via FFmpeg wrapper.\n";
-                return 1;
             }
+
             std::cout << "Decompressed size: " << result.size() << " bytes\n";
         }
 
